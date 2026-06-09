@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel Preditivo de Alarmes — Frota CAT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root,[data-theme="dark"]{
+  --bg:#0f141a;--surface:#161d26;--surface-2:#1c2530;--surface-3:#233041;--border:#2d3a49;
+  --text:#e8eef5;--muted:#99a7b7;--faint:#657284;--primary:#ffcd11;--primary-2:#e1b300;
+  --red:#e35d6a;--red-bg:#3a1d24;--amber:#f2b94b;--amber-bg:#3c3014;--green:#46c37b;--green-bg:#143224;
+  --blue:#5aa9ff;--blue-bg:#13283f;--purple:#b38cff;--purple-bg:#2a1f41;
+  --shadow:0 12px 32px rgba(0,0,0,.26);--radius:14px;--radius-sm:10px;
+}
+[data-theme="light"]{
+  --bg:#f4f7fa;--surface:#ffffff;--surface-2:#f7f9fc;--surface-3:#eef3f8;--border:#d7e0ea;
+  --text:#15202b;--muted:#536273;--faint:#8291a0;--primary:#c38d00;--primary-2:#8d6700;
+  --red:#c53d4a;--red-bg:#fdecee;--amber:#b27a00;--amber-bg:#fff4d8;--green:#157f4a;--green-bg:#e6f7ee;
+  --blue:#1769cc;--blue-bg:#e9f2ff;--purple:#7f4bcc;--purple-bg:#f1eaff;
+  --shadow:0 10px 28px rgba(20,32,43,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:Inter,Segoe UI,system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;font-size:14px}
+button,input,select{font:inherit}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 24px;background:linear-gradient(90deg,var(--surface),color-mix(in srgb,var(--surface) 82%, var(--primary) 18%));border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;backdrop-filter:blur(10px)}
+.brand{display:flex;align-items:center;gap:14px}.brand-mark{width:46px;height:46px;border-radius:12px;background:var(--primary);color:#000;display:grid;place-items:center;font-weight:800}.brand h1{font-size:20px;letter-spacing:-.02em}.brand p{font-size:12px;color:var(--muted)}
+.top-actions,.filters,.subfilters,.nav,.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--border);background:var(--surface-2);color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;transition:.2s;font-weight:600}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#000}.btn.primary:hover{background:var(--primary-2)}
+.btn.soft{background:var(--surface)}
+select,input[type=text],input[type=date]{background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;min-height:42px}
+label.meta{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+.shell{max-width:1480px;margin:0 auto;padding:18px 24px 48px}
+.filters-card,.card,.kpi,.timeline-item,.alert,.table-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.filters-card{padding:16px;margin-bottom:16px}
+.filters-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.filters-grid .field{display:flex;flex-direction:column;gap:6px}
+@media(max-width:1180px){.filters-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:720px){.filters-grid{grid-template-columns:1fr 1fr}.shell{padding:16px}.topbar{padding:16px}}
+@media(max-width:520px){.filters-grid{grid-template-columns:1fr}}
+.nav{margin:14px 0 18px;padding-bottom:4px;overflow:auto}.nav button{white-space:nowrap;border:none;background:transparent;color:var(--muted);padding:10px 14px;border-radius:10px;font-weight:700}.nav button.on{background:var(--surface-3);color:var(--primary)}
+.hero{display:grid;grid-template-columns:1.3fr .7fr;gap:16px;margin-bottom:16px}.hero-panel{padding:18px}.hero h2{font-size:22px;margin-bottom:8px}.hero p{color:var(--muted);max-width:72ch}.hero-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}.mini{padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
+@media(max-width:960px){.hero{grid-template-columns:1fr}.hero-stats{grid-template-columns:1fr 1fr}} @media(max-width:560px){.hero-stats{grid-template-columns:1fr}}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px}.kpi{padding:16px;position:relative;overflow:hidden}.kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--primary)}.kpi.red::before{background:var(--red)}.kpi.amber::before{background:var(--amber)}.kpi.green::before{background:var(--green)}.kpi.blue::before{background:var(--blue)}
+.kpi .lab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:700}.kpi .val{font-size:30px;font-weight:800;margin-top:8px;letter-spacing:-.04em}.kpi .sub{font-size:12px;color:var(--faint);margin-top:4px}
+@media(max-width:1180px){.kpis{grid-template-columns:repeat(3,1fr)}} @media(max-width:720px){.kpis{grid-template-columns:1fr 1fr}} @media(max-width:520px){.kpis{grid-template-columns:1fr}}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:1080px){.g4,.g3,.g2{grid-template-columns:1fr}}
+.card{padding:18px}.card h3{font-size:15px;margin-bottom:4px}.hint{font-size:12px;color:var(--muted);margin-bottom:12px}
+.chart-wrap{position:relative;min-height:300px}.chart-wrap.short{min-height:220px}
+.page{display:none}.page.on{display:block}
+.table-tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.table-tools input{flex:1;min-width:220px}
+.table-scroll{max-height:540px;overflow:auto;border:1px solid var(--border);border-radius:12px}
+table{width:100%;border-collapse:collapse}th,td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left}th{position:sticky;top:0;background:var(--surface-2);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}tr:hover td{background:var(--surface-2)}td.num{text-align:right;font-variant-numeric:tabular-nums}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;font-size:11px;font-weight:800}
+.lvl3{background:var(--red-bg);color:var(--red)}.lvl2{background:var(--amber-bg);color:var(--amber)}.lvl1{background:var(--green-bg);color:var(--green)}.soft{background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+.tag-sys{background:var(--blue-bg);color:var(--blue)}.tag-comp{background:var(--purple-bg);color:var(--purple)}
+.progress{height:8px;background:var(--surface-3);border-radius:999px;overflow:hidden}.progress > div{height:100%;background:var(--primary);border-radius:999px}
+.timeline{display:grid;gap:12px}.timeline-item{padding:14px}.timeline-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.timeline-meta{font-size:12px;color:var(--muted);margin-top:4px}.timeline-desc{margin-top:10px;color:var(--text)}
+.alerts{display:grid;gap:10px}.alert{padding:14px 16px}.alert strong{color:var(--text)}.alert.red{border-left:4px solid var(--red)}.alert.amber{border-left:4px solid var(--amber)}.alert.blue{border-left:4px solid var(--blue)}.alert.green{border-left:4px solid var(--green)}.alert.purple{border-left:4px solid var(--purple)}
+.pill-row{display:flex;flex-wrap:wrap;gap:8px}.pill{padding:8px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);font-size:12px;color:var(--muted)}
+.footer{padding:24px 0 0;color:var(--faint);font-size:12px;text-align:center}
+.hidden{display:none !important}
+.playbook-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}@media(max-width:1080px){.playbook-grid{grid-template-columns:1fr}}
+.pb-card{padding:16px;border-radius:12px;border:1px solid var(--border);background:var(--surface-2)}
+.pb-card h4{font-size:14px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.pb-card .pb-tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;padding:3px 8px;border-radius:999px}
+.pb-control .pb-tag{background:var(--red-bg);color:var(--red)}.pb-maint .pb-tag{background:var(--blue-bg);color:var(--blue)}.pb-op .pb-tag{background:var(--green-bg);color:var(--green)}
+.pb-card ul{margin:8px 0 0 18px}.pb-card li{margin-bottom:6px;color:var(--text)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%}.dot.red{background:var(--red)}.dot.amber{background:var(--amber)}.dot.green{background:var(--green)}.dot.blue{background:var(--blue)}
+.flow{display:grid;gap:0}
+.flow-step{display:grid;grid-template-columns:170px 1fr;gap:12px;padding:10px 0;border-left:2px solid var(--border);margin-left:8px;padding-left:14px;position:relative}
+.flow-step::before{content:"";position:absolute;left:-7px;top:16px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--primary)}
+.flow-step.dec::before{border-color:var(--red);background:var(--red-bg)}
+.flow-role{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;align-self:start;padding:4px 8px;border-radius:8px}
+.role-op{background:var(--green-bg);color:var(--green)}.role-co{background:var(--blue-bg);color:var(--blue)}.role-cm{background:var(--amber-bg);color:var(--amber)}.role-sm{background:var(--purple-bg);color:var(--purple)}.role-dec{background:var(--red-bg);color:var(--red)}
+.flow-act{font-size:13px;color:var(--text)}.flow-meta{display:inline-block;margin-top:5px;font-size:11px;font-weight:700;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:2px 8px}
+@media(max-width:560px){.flow-step{grid-template-columns:1fr}}
+.note{font-size:12px;color:var(--faint);background:var(--surface-2);border:1px dashed var(--border);border-radius:10px;padding:10px 12px;margin-top:10px}
+.status-chip{font-size:11px;font-weight:800;padding:3px 8px;border-radius:999px}
+.st-iminente{background:var(--red-bg);color:var(--red)}.st-vencido{background:var(--amber-bg);color:var(--amber)}.st-estavel{background:var(--green-bg);color:var(--green)}.st-na{background:var(--surface-3);color:var(--muted)}
+.action-chip{font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ac-parar{background:var(--red-bg);color:var(--red)}.ac-inspecionar{background:var(--amber-bg);color:var(--amber)}.ac-programar{background:var(--blue-bg);color:var(--blue)}.ac-monitorar{background:var(--green-bg);color:var(--green)}
+.traffic{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:900}.tr-red{background:var(--red-bg);color:var(--red)}.tr-amber{background:var(--amber-bg);color:var(--amber)}.tr-green{background:var(--green-bg);color:var(--green)}
+.conf-baixa{background:var(--surface-3);color:var(--muted)}.conf-media{background:var(--amber-bg);color:var(--amber)}.conf-alta{background:var(--green-bg);color:var(--green)}
+.sla{font-size:11px;color:var(--muted);display:block;margin-top:3px}
+
+</style>
+</head>
+<body data-theme="dark">
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">CAT</div>
+    <div>
+      <h1>Painel Preditivo de Alarmes — Frota CAT</h1>
+      <p>Diagnóstico técnico, predição de falhas e instrução por público (sala de controle · manutenção · operação)</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <button class="btn soft" id="themeToggle">Tema</button>
+    <button class="btn soft" id="btnHelp">Formato CSV</button>
+    <button class="btn soft" id="btnRef">Carregar CID / FMI / MID</button>
+    <button class="btn soft" id="btnExportCsv">Exportar recorte</button>
+    <button class="btn primary" id="btnUpload">Carregar eventos</button>
+    <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+    <input type="file" id="refInput" accept=".csv,text/csv" class="hidden" multiple>
+  </div>
+</header>
+
+<main class="shell">
+  <section class="filters-card">
+    <div class="filters-grid">
+      <div class="field"><label class="meta">Frota</label><select id="selFrota"></select></div>
+      <div class="field"><label class="meta">Máquina</label><select id="selMaq"></select></div>
+      <div class="field"><label class="meta">Sistema</label><select id="selSistema"></select></div>
+      <div class="field"><label class="meta">Nível</label><select id="selNivel"></select></div>
+      <div class="field"><label class="meta">Operador</label><select id="selOperador"></select></div>
+      <div class="field"><label class="meta">Período</label><select id="selPeriodo"></select></div>
+    </div>
+    <div class="toolbar" style="margin-top:12px;justify-content:space-between">
+      <div class="pill-row" id="scopePills"></div>
+      <div class="subfilters">
+        <button class="btn soft" id="btnReset">Limpar filtros</button>
+        <button class="btn soft" id="btnSample">Carregar amostra</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="hero">
+    <div class="filters-card hero-panel">
+      <h2>Do volume de alarmes para a ação certa</h2>
+      <p>O painel cruza eventos brutos com um catálogo de componentes canônicos, corrige a severidade (N3 = crítico) e responde três perguntas: o que está falhando agora, o que vai falhar em breve e o que cada equipe deve fazer.</p>
+      <div class="pill-row" style="margin-top:14px">
+        <span class="pill">Canonicalização de variantes de alarme</span>
+        <span class="pill">Severidade N1/N2/N3 correta</span>
+        <span class="pill">Sequências precursoras reais</span>
+        <span class="pill">Recorrência e aceleração</span>
+        <span class="pill">Playbooks por público</span>
+      </div>
+    </div>
+    <div class="filters-card hero-panel">
+      <div class="hero-stats">
+        <div class="mini"><div class="meta">Última atualização</div><div id="lastUpdate" style="font-size:20px;font-weight:800;margin-top:6px">—</div></div>
+        <div class="mini"><div class="meta">Cobertura</div><div id="coverage" style="font-size:20px;font-weight:800;margin-top:6px">Sem dados</div></div>
+        <div class="mini"><div class="meta">Ativos críticos</div><div id="criticalMachines" style="font-size:20px;font-weight:800;margin-top:6px">0</div></div>
+        <div class="mini"><div class="meta">Camada FMI/CID/MID</div><div id="refStat" style="font-size:14px;font-weight:800;margin-top:6px">Aguardando referência</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="nav" aria-label="Navegação do painel">
+    <button class="on" data-page="executivo">Executivo</button>
+    <button data-page="ativos">Ativos críticos</button>
+    <button data-page="diagnostico">Diagnóstico</button>
+    <button data-page="predicao">Predição</button>
+    <button data-page="acoes">Top ações do turno</button>
+    <button data-page="playbooks">Playbooks</button>
+    <button data-page="tratativas">Tratativas</button>
+    <button data-page="timeline">Timeline</button>
+    <button data-page="analitico">Alarmes e sistemas</button>
+    <button data-page="dados">Dados completos</button>
+  </section>
+
+  <!-- EXECUTIVO -->
+  <section id="executivo" class="page on">
+    <div class="kpis">
+      <div class="kpi"><div class="lab">Total de alarmes</div><div class="val" id="kpiTotal">0</div><div class="sub" id="kpiTotalSub">Sem base carregada</div></div>
+      <div class="kpi red"><div class="lab">Eventos N3</div><div class="val" id="kpiN3">0</div><div class="sub" id="kpiN3Sub">Ação imediata</div></div>
+      <div class="kpi amber"><div class="lab">Eventos N2</div><div class="val" id="kpiN2">0</div><div class="sub" id="kpiN2Sub">Atenção operacional</div></div>
+      <div class="kpi green"><div class="lab">Eventos N1</div><div class="val" id="kpiN1">0</div><div class="sub" id="kpiN1Sub">Informativo</div></div>
+      <div class="kpi blue"><div class="lab">Score médio</div><div class="val" id="kpiScore">0</div><div class="sub" id="kpiScoreSub">Recência + severidade + repetição</div></div>
+    </div>
+    <div class="grid g2">
+      <article class="card">
+        <h3>Distribuição por sistema</h3>
+        <div class="hint">Peso crítico por sistema (N3 vale 9, N2 vale 4, N1 vale 1).</div>
+        <div class="chart-wrap"><canvas id="chartSistema"></canvas></div>
+      </article>
+      <article class="card">
+        <h3>Tendência diária</h3>
+        <div class="hint">Série temporal das ocorrências para validar aceleração de degradação.</div>
+        <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+      </article>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <article class="card">
+        <h3>Sinais prioritários</h3>
+        <div class="hint">Motor de priorização para ação imediata.</div>
+        <div class="alerts" id="alertsBox"></div>
+      </article>
+      <article class="card">
+        <h3>Ranking resumido por máquina</h3>
+        <div class="hint">Combina severidade, volume, recência e diversidade de componentes.</div>
+        <div id="machineSummary"></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ATIVOS -->
+  <section id="ativos" class="page">
+    <div class="grid g2">
+      <article class="card">
+        <h3>Top ativos por score de criticidade</h3>
+        <div class="hint">Ordenação útil para engenharia: severidade corrigida + reincidência + recência.</div>
+        <div class="chart-wrap"><canvas id="chartMachines"></canvas></div>
+      </article>
+      <article class="card">
+        <h3>Mapa de severidade por máquina</h3>
+        <div class="hint">Leitura rápida do equilíbrio N3/N2/N1 nos principais ativos.</div>
+        <div class="table-scroll"><table><thead><tr><th>Máquina</th><th>Frota</th><th>Score</th><th>N3</th><th>N2</th><th>N1</th><th>Última</th><th>Ação recomendada</th><th>Operação</th><th>Manutenção</th></tr></thead><tbody id="tbMachines"></tbody></table></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- DIAGNÓSTICO -->
+  <section id="diagnostico" class="page">
+    <article class="card" style="margin-bottom:16px">
+      <h3>Padrões de causa-raiz detectados</h3>
+      <div class="hint">Regras que olham além do alarme isolado. As regras de barramento/CAN dependem da referência FMI/CID/MID.</div>
+      <div class="alerts" id="rootCauseBox"></div>
+    </article>
+    <article class="card">
+      <h3>Componentes por reincidência</h3>
+      <div class="hint">Visão canônica: variantes do mesmo componente são somadas. <strong>CID</strong> é casado pela descrição do alarme (alta precisão; só preenche com sobreposição forte). <strong>MID</strong> com <strong>~</strong> é provável (inferido pelo sistema). FMI aparece se a base de eventos trouxer o código.</div>
+      <div class="table-scroll"><table><thead><tr><th>Componente</th><th>Sistema</th><th>CID</th><th>FMI</th><th>MID~</th><th>Ocorr.</th><th>Máquinas</th><th>Nível dom.</th></tr></thead><tbody id="tbComponentes"></tbody></table></div>
+    </article>
+  </section>
+
+  <!-- PREDIÇÃO -->
+  <section id="predicao" class="page">
+    <article class="card" style="margin-bottom:16px">
+      <h3>Sequências precursoras (mesma máquina, em ordem, dentro da janela)</h3>
+      <div class="hint">A → B entre <strong>episódios</strong> (rajadas colapsadas) no mesmo ativo, com B depois de A. Lead time médio = janela típica para intervir antes de B.</div>
+      <div class="table-scroll"><table><thead><tr><th>Precursor (A)</th><th>Consequente (B)</th><th>Episódios A→B</th><th>Máquinas</th><th>Lead time médio</th></tr></thead><tbody id="tbSeq"></tbody></table></div>
+      <div class="note">Janela de associação: <strong id="seqWindow">72h</strong>. Ajustável no topo da tabela de recorrência abaixo.</div>
+    </article>
+    <article class="card">
+      <h3>Recorrência e janela até o próximo evento</h3>
+      <div class="hint">Por (máquina, componente), medida entre <strong>episódios</strong> (rajadas de até 30 min contam como um): intervalo mediano, aceleração da cadência e projeção do próximo flare-up.</div>
+      <div class="table-tools">
+        <label class="meta" style="align-self:center">Janela de sequência</label>
+        <select id="selSeqWindow" style="max-width:160px"><option value="24">24h</option><option value="72" selected>72h</option><option value="168">7 dias</option></select>
+      </div>
+      <div class="table-scroll"><table><thead><tr><th>Máquina</th><th>Componente</th><th>Episódios</th><th>Intervalo mediano</th><th>Tendência</th><th>Último</th><th>Próximo estimado</th><th>Status</th><th>Confiança</th><th>Ação</th></tr></thead><tbody id="tbRecorrencia"></tbody></table></div>
+    </article>
+  </section>
+
+
+  <!-- AÇÕES DO TURNO -->
+  <section id="acoes" class="page">
+    <article class="card" style="margin-bottom:16px">
+      <h3>Top ações recomendadas do turno</h3>
+      <div class="hint">Lista operacional priorizada. Junta severidade, recorrência, aceleração, criticidade do sistema e regras por FMI/CID quando disponíveis.</div>
+      <div class="table-scroll"><table><thead><tr><th>Prior.</th><th>Máquina</th><th>Sistema</th><th>Componente</th><th>Risco</th><th>Conf.</th><th>Ação recomendada</th><th>Operação</th><th>Manutenção</th><th>PCM/Engenharia</th></tr></thead><tbody id="tbTopAcoes"></tbody></table></div>
+    </article>
+    <div class="grid g2">
+      <article class="card">
+        <h3>Regras automáticas aplicadas</h3>
+        <div class="hint">Estas regras evitam tratar todo alarme como igual.</div>
+        <div class="alerts" id="rulesBox"></div>
+      </article>
+      <article class="card">
+        <h3>Guia rápido FMI</h3>
+        <div class="hint">Quando a base trouxer FMI, a ação técnica muda conforme o modo de falha.</div>
+        <div class="table-scroll"><table><thead><tr><th>FMI</th><th>Interpretação</th><th>Ação de manutenção</th></tr></thead><tbody id="tbFmiGuide"></tbody></table></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- PLAYBOOKS -->
+  <section id="playbooks" class="page">
+    <article class="card">
+      <h3>Playbook de ação por componente</h3>
+      <div class="hint">Selecione um componente para ver a instrução de cada público. As ações são chaveadas por sistema e por modo de falha.</div>
+      <div class="table-tools">
+        <label class="meta" style="align-self:center">Componente</label>
+        <select id="selPlaybook" style="flex:1;min-width:260px"></select>
+      </div>
+      <div id="playbookHead" style="margin:8px 0 14px"></div>
+      <div class="playbook-grid" id="playbookGrid"></div>
+    </article>
+  </section>
+
+  <!-- TRATATIVAS -->
+  <section id="tratativas" class="page">
+    <div class="grid g2">
+      <article class="card">
+        <h3>Fluxo de designação (Mapa de Comunicação)</h3>
+        <div class="hint">Cadeia oficial de tratativa: quem aciona quem, sistema/artefato e SLA em cada etapa.</div>
+        <div class="toolbar" style="margin-bottom:12px">
+          <button class="btn soft" id="btnFlowCorr">Corretiva</button>
+          <button class="btn soft" id="btnFlowPrev">Preventiva</button>
+        </div>
+        <div id="flowBox"></div>
+      </article>
+      <article class="card">
+        <h3>Ficha de tratativa por evento</h3>
+        <div class="hint">Pré-preenchida pelo diagnóstico do recorte: falha, CID, local e nível, com caminho sugerido e mensagem pronta.</div>
+        <div class="table-tools">
+          <label class="meta" style="align-self:center">Componente</label>
+          <select id="selTrat" style="flex:1;min-width:240px"></select>
+        </div>
+        <div id="fichaHead" style="margin:8px 0 12px"></div>
+        <div id="fichaFlow" style="margin-bottom:12px"></div>
+        <label class="meta">Mensagem para a sala de controle</label>
+        <textarea id="fichaMsg" readonly style="width:100%;min-height:96px;margin-top:6px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:10px;font:inherit;resize:vertical"></textarea>
+        <div class="toolbar" style="margin-top:10px"><button class="btn primary" id="btnCopyMsg">Copiar mensagem</button><span id="copyOk" class="pill" style="display:none">Copiado</span></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- TIMELINE -->
+  <section id="timeline" class="page">
+    <article class="card">
+      <h3>Timeline técnica da máquina selecionada</h3>
+      <div class="hint">Filtre uma máquina para enxergar precursão e reincidência em ordem cronológica.</div>
+      <div class="timeline" id="timelineBox"></div>
+    </article>
+  </section>
+
+  <!-- ANALÍTICO -->
+  <section id="analitico" class="page">
+    <div class="grid g2">
+      <article class="card">
+        <h3>Ranking de alarmes (canônico)</h3>
+        <div class="hint">Variantes do mesmo componente somadas. Texto original preservado nos dados completos.</div>
+        <div class="table-scroll"><table><thead><tr><th>Componente</th><th>Sistema</th><th>Nível dom.</th><th>Ocorrências</th><th>Participação</th></tr></thead><tbody id="tbAlarmes"></tbody></table></div>
+      </article>
+      <article class="card">
+        <h3>Resumo por sistema</h3>
+        <div class="hint">Volume absoluto e carga crítica por sistema.</div>
+        <div class="table-scroll"><table><thead><tr><th>Sistema</th><th>Total</th><th>N3</th><th>N2</th><th>N1</th><th>Peso crítico</th></tr></thead><tbody id="tbSistemas"></tbody></table></div>
+      </article>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <article class="card">
+        <h3>Operadores com maior exposição</h3>
+        <div class="hint">Use como triagem; metade dos eventos pode não ter operador informado.</div>
+        <div class="chart-wrap short"><canvas id="chartOperador"></canvas></div>
+      </article>
+      <article class="card">
+        <h3>Distribuição por operador</h3>
+        <div class="hint">Contagem total, máquinas distintas e peso de severidade.</div>
+        <div class="table-scroll"><table><thead><tr><th>Operador</th><th>Ocorr.</th><th>Máquinas</th><th>Peso</th></tr></thead><tbody id="tbOperadores"></tbody></table></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- DADOS -->
+  <section id="dados" class="page">
+    <article class="card">
+      <h3>Base enriquecida</h3>
+      <div class="hint">Texto original do alarme preservado exatamente; componente e sistema são colunas derivadas.</div>
+      <div class="table-tools"><input type="text" id="searchTable" placeholder="Pesquisar alarme, componente, máquina, operador ou sistema"></div>
+      <div class="table-scroll"><table><thead><tr><th>Data</th><th>Frota</th><th>Máquina</th><th>Sistema</th><th>Componente</th><th>Alarme original</th><th>Nível</th><th>CID</th><th>FMI</th><th>Operador</th></tr></thead><tbody id="tbRaw"></tbody></table></div>
+    </article>
+  </section>
+
+  <footer class="footer">Processamento local no navegador. Severidade N3>N2>N1. Camada FMI/CID/MID ativada por upload de referência.</footer>
+</main>
+
+<dialog id="helpDialog" style="padding:0;border:none;border-radius:16px;max-width:780px;width:min(92vw,780px)">
+  <div style="padding:22px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px"><h3>Formato esperado dos arquivos</h3><button class="btn soft" id="closeHelp">Fechar</button></div>
+    <p style="color:var(--muted);margin-bottom:8px"><strong>Eventos</strong> — colunas: Frota, Máquina, Data da Ocorrência_, Descrição do alarme, Nível do evento, Operador, TAG (Sistema é opcional, derivado se vazio).</p>
+    <div class="pill-row" style="margin-bottom:14px">
+      <span class="pill">Frota → CAT_785C, CAT_777G</span>
+      <span class="pill">Data → dd/mm/aaaa hh:mm:ss</span>
+      <span class="pill">Nível → 1, 2 ou 3 (3 = crítico)</span>
+    </div>
+    <p style="color:var(--muted);margin-bottom:8px"><strong>Dicionários CID / FMI / MID</strong> (opcionais) — três arquivos separados, detectados pelo cabeçalho. Pode selecionar os três de uma vez.</p>
+    <div class="pill-row">
+      <span class="pill">CID.csv → CID, Descrição</span>
+      <span class="pill">FMI.csv → Descrição, FMI</span>
+      <span class="pill">MID.csv → MID, Descrição</span>
+    </div>
+  </div>
+</dialog>
+
+<script>
+/* ===================== CONFIG ===================== */
+// Severidade corrigida: N3 é o mais crítico.
+const severityWeight = {3:9, 2:4, 1:1};
+const levelLabel = n => `N${n}`;
+const levelClass = n => n===3 ? 'lvl3' : n===2 ? 'lvl2' : 'lvl1';
+
+// Dicionário FMI (J1939) — usado quando a referência traz o FMI.
+const FMI_DICT = {
+  0:'Dado acima do normal (mais severo)',1:'Dado abaixo do normal (mais severo)',
+  2:'Dado errático/intermitente',3:'Tensão acima do normal / curto p/ alta',
+  4:'Tensão abaixo do normal / curto p/ baixa',5:'Corrente abaixo do normal / circuito aberto',
+  6:'Corrente acima do normal / curto p/ terra',7:'Sistema mecânico não responde',
+  8:'Frequência/largura de pulso anormal',9:'Atualização anormal (falha de CAN/comunicação)',
+  10:'Taxa de variação anormal',11:'Causa desconhecida',12:'Componente/módulo com defeito',
+  13:'Fora de calibração',14:'Instrução especial',15:'Acima do normal (menos severo)',
+  16:'Acima do normal (moderadamente severo)',17:'Abaixo do normal (menos severo)',
+  18:'Abaixo do normal (moderadamente severo)',19:'Erro de dado recebido pela rede',
+  20:'Dado em deriva alta',21:'Dado em deriva baixa',31:'Condição existe'
+};
+
+// Tokenização para casar componente (texto inglês do alarme) com a descrição do CID.
+const CID_STOP = new Set(['the','of','and','a','to','for','sensor']);
+function cidTokens(s=''){
+  const t = s.toLowerCase().replace(/#/g,' ').replace(/[/().,_\-]/g,' ').split(/\s+/);
+  return new Set(t.filter(x=>x && (x.length>1 || /^\d+$/.test(x)) && !CID_STOP.has(x)));
+}
+function cleanForMatch(s=''){ return s.replace(/\b(alarm|sensor fault|sensor alarm)\b/gi,'').replace(/\s+/g,' ').trim(); }
+// MID provável por sistema (módulo VIMS de partida — inferência por sistema, não medição).
+const SYS_MID = {
+  'Motor':'36','Transmissão':'297','Freios':'116','Direção':'87','Diferencial':'87',
+  'Elétrico':'49','Payload':'82','Implementos':'82','Chassi':'87','Lubrificação':'82','Pneus':'87'
+};
+
+// Mapa de canonicalização: variantes (forma longa/curta) -> componente + sistema.
+// Texto original NUNCA é alterado; isto só anexa colunas derivadas.
+const CANON_MAP = {
+  'cylinder #11 injector alarm':      ['Injetor — Cilindro 11','Motor'],
+  'inj-cyl 11 sensor fault':          ['Injetor — Cilindro 11','Motor'],
+  'cylinder #6 injector alarm':       ['Injetor — Cilindro 6','Motor'],
+  'transmission output speed sensor alarm':['Sensor Rotação Saída da Transmissão','Transmissão'],
+  'tran out speed sensor fault':      ['Sensor Rotação Saída da Transmissão','Transmissão'],
+  'trn out spd sensor fault':         ['Sensor Rotação Saída da Transmissão','Transmissão'],
+  'eng spd trn sensor fault':         ['Sensor Rotação do Motor','Motor'],
+  'gear code sensor fault':           ['Sensor Código de Marcha','Transmissão'],
+  'directional switch alarm':         ['Chave Direcional (F/N/R)','Transmissão'],
+  'throttl sw pos sensor fault':      ['Sensor Posição do Acelerador','Motor'],
+  'ground spd alarm':                 ['Velocidade de Solo','Transmissão'],
+  'body up;gnd spd alarm':            ['Caçamba Levantada + Veloc. de Solo','Payload'],
+  'payload status alarm':             ['Status de Payload','Payload'],
+  'air fltr alarm':                   ['Filtro de Ar do Motor','Motor'],
+  'eng oil fltr alarm':               ['Filtro de Óleo do Motor','Motor'],
+  'high oil filter differential pressure alarm':['Pressão Diferencial do Filtro de Óleo','Motor'],
+  'air conditioner evaporator coil temperature sensor alarm':['Sensor Temp. Evaporador A/C','Cabine/AC'],
+  'intake manifold air temperature sensor alarm':['Sensor Temp. Coletor de Admissão','Motor'],
+  'intake manifold #2 pressure sensor alarm':['Sensor Pressão Coletor #2','Motor'],
+  'air inlet temperature sensor alarm':['Sensor Temp. Entrada de Ar','Motor'],
+  'turbocharger #1 compressor inlet pressure sensor alarm':['Sensor Pressão Turbo #1','Motor'],
+  'turbocharger #2 compressor inlet pressure sensor alarm':['Sensor Pressão Turbo #2','Motor'],
+  'high exhaust temperature derate alarm':['Derate por Temp. de Escape Alta','Motor'],
+  'engine shutdown due to loss of machine lockout alarm':['Desligamento — Perda de Lockout','Motor'],
+  'user defined shutdown alarm':      ['Desligamento Definido pelo Usuário','Motor'],
+  'rt r susp cyl sensor fault':       ['Cilindro de Suspensão Tras. Direito','Suspensão'],
+  'brake oil diverter solenoid alarm':['Solenoide Desviador de Óleo de Freio','Freios'],
+  'rt r brk sol sensor fault':        ['Solenoide de Freio Tras. Direito','Freios'],
+  'lt r brk sol sensor fault':        ['Solenoide de Freio Tras. Esquerdo','Freios'],
+  'parking brake pressure switch alarm':['Pressostato Freio de Estacionamento','Freios'],
+  'right front implement pump solenoid alarm':['Solenoide Bomba de Implemento Diant. Dir.','Implementos'],
+  'implement lockout switch alarm':   ['Chave de Lockout de Implemento','Implementos'],
+  'arc control solenoid alarm':       ['Solenoide de Controle ARC','Implementos'],
+  'auto lube sol sensor fault':       ['Solenoide de Lubrificação Automática','Lubrificação'],
+  'unknown event 38 sensor fault':    ['Evento Desconhecido 38','Não classificado']
+};
+
+// Classificador de sistema por regex (fallback para alarmes não mapeados).
+function systemFromText(text=''){
+  const t = text.toLowerCase();
+  if(/injector|cylinder|turbo|intake|exhaust|coolant|eng |engine|oil fl|air fl|derate|throttl|manifold|inlet/.test(t)) return 'Motor';
+  if(/transmission|tran |trn |gear|output speed|directional|ground spd|gnd spd|torque|clutch/.test(t)) return 'Transmissão';
+  if(/brake|brk|accumulator|parking/.test(t)) return 'Freios';
+  if(/steer|direção|direction(?!al)/.test(t)) return 'Direção';
+  if(/susp|ride/.test(t)) return 'Suspensão';
+  if(/payload|body up|carga/.test(t)) return 'Payload';
+  if(/implement|hoist|hydraulic|pump|arc/.test(t)) return 'Implementos';
+  if(/lube|lubrific/.test(t)) return 'Lubrificação';
+  if(/air conditioner|cab|hvac|evaporator/.test(t)) return 'Cabine/AC';
+  if(/voltage|electric|sensor|communication|can|battery/.test(t)) return 'Elétrico';
+  return 'Outros';
+}
+function cleanLabel(s=''){
+  return s.replace(/\b(alarm|sensor fault|sensor alarm)\b/gi,'').replace(/\s+/g,' ').trim() || s.trim();
+}
+function canonicalize(desc=''){
+  const key = desc.toLowerCase().trim();
+  if(CANON_MAP[key]) return {component:CANON_MAP[key][0], sistema:CANON_MAP[key][1]};
+  return {component:cleanLabel(desc), sistema:systemFromText(desc)};
+}
+// Normalização de sistema (rótulos em inglês do VIMS -> sistemas canônicos em português).
+const SYS_MAP = {
+  'parking brake':'Freios','brake':'Freios','brake / air system':'Freios',
+  'payload':'Payload','payload / monitoring':'Payload','hoist / body':'Implementos',
+  'differential / axle':'Diferencial',
+  'electrical / data link / vims':'Elétrico','electrical / sensor supply':'Elétrico',
+  'vims':'Elétrico','communication':'Elétrico','electronic control module':'Elétrico',
+  'tires / tkph':'Pneus',
+  'engine':'Motor','engine lubrication':'Motor','engine / fuel control':'Motor',
+  'engine / prelube':'Motor','engine cooling':'Motor','engine / turbocharger':'Motor',
+  'engine / air intake':'Motor','engine / injector':'Motor','fuel system':'Motor','fluid level':'Motor',
+  'frame / chassis':'Chassi',
+  'transmission / torque converter':'Transmissão','transmission':'Transmissão',
+  'autolube':'Lubrificação','steering':'Direção','suspension':'Suspensão',
+  'general / unknown':'Outros'
+};
+function normalizeSistema(s=''){
+  const k = String(s).trim().toLowerCase();
+  if(!k) return null;
+  if(SYS_MAP[k]) return SYS_MAP[k];
+  // PT já-canônico passa direto; senão tenta inferir por texto
+  if(['Motor','Transmissão','Freios','Direção','Suspensão','Payload','Diferencial','Pneus','Chassi','Implementos','Lubrificação','Elétrico','Cabine/AC','Outros','Não classificado'].includes(s.trim())) return s.trim();
+  return systemFromText(k);
+}
+
+// Playbooks por sistema (instrução por público). Componentes específicos podem sobrescrever.
+const PLAYBOOKS = {
+  'Motor':{
+    control:['Para N3: acionar parada segura e comunicar despacho/manutenção imediatamente.','Verificar painel VIMS por derate ativo ou desligamento iminente.','Registrar horímetro e condição de carga no momento do evento.'],
+    maint:['Ler códigos ativos e log no ET; confirmar CID/FMI do componente.','Para injetor reincidente: medir resistência/atuação do injetor e checar chicote do cilindro.','Inspecionar filtros (ar/óleo) e pressão diferencial antes de liberar o ativo.'],
+    op:['Evitar aceleração brusca e operação sob derate.','Reportar fumaça, perda de potência ou ruído anormal.','Não reiniciar repetidamente após desligamento por proteção.']
+  },
+  'Transmissão':{
+    control:['Para N3 de rotação de saída: tratar como risco de perda de tração — restringir descidas carregadas.','Confirmar se há perda de marcha ou neutralização involuntária.','Acionar manutenção para diagnóstico de ECM da transmissão.'],
+    maint:['Verificar sensor de rotação de saída: chicote, conector e folga do alvo.','FMI 9/19 no ECM da transmissão indica falha de CAN — checar barramento e terminação.','Confirmar código de marcha e calibração após a troca do sensor.'],
+    op:['Reduzir velocidade e evitar trocas de marcha sob carga.','Reportar patinagem, solavanco ou marcha que não engata.','Não operar em rampa se houver alarme ativo de transmissão.']
+  },
+  'Freios':{
+    control:['Alarme de freio é prioridade máxima de segurança — restringir o ativo até liberação.','Confirmar pressão de acumulador e atuação do freio de estacionamento.','Bloquear operação em rampa.'],
+    maint:['Testar solenoides e pressostatos; verificar vazamento e pressão de acumulador.','Inspecionar chicote dos solenoides traseiros (esq./dir.).','Validar resposta do freio antes de liberar.'],
+    op:['Testar freios em local plano e seguro antes de carregar.','Reportar curso de pedal alterado ou alerta de pressão.','Em dúvida sobre frenagem, parar e acionar manutenção.']
+  },
+  'Suspensão':{
+    control:['Monitorar; raramente exige parada imediata salvo perda de estabilidade.','Registrar condição de pista e carga.'],
+    maint:['Verificar carga de nitrogênio e vedação do cilindro de suspensão.','Checar sensor e chicote do cilindro afetado.'],
+    op:['Evitar impactos e velocidade alta em pista irregular.','Reportar batidas ou inclinação anormal da caçamba.']
+  },
+  'Payload':{
+    control:['Validar pesagem antes de liberar ciclo; risco de sobrecarga.','Confirmar caçamba abaixada antes de deslocamento.'],
+    maint:['Calibrar sistema de payload; verificar sensores de inclinação/pressão.','Checar interlock de caçamba levantada com velocidade.'],
+    op:['Não trafegar com caçamba levantada.','Respeitar limite de carga; reportar pesagem inconsistente.']
+  },
+  'Implementos':{
+    control:['Avaliar impacto no ciclo; isolar função afetada se necessário.'],
+    maint:['Testar solenoides de bomba e controle; verificar pressão hidráulica.','Inspecionar chave de lockout e chicotes.'],
+    op:['Operar implemento com cautela; reportar movimento lento ou travado.']
+  },
+  'Lubrificação':{
+    control:['Monitorar; falha prolongada acelera desgaste de pinos/buchas.'],
+    maint:['Verificar solenoide e bomba de lubrificação automática e nível de graxa.','Confirmar ciclo de lubrificação após reparo.'],
+    op:['Reportar pontos secos ou ruído de articulação.']
+  },
+  'Cabine/AC':{
+    control:['Baixa prioridade operacional; registrar para manutenção programada.'],
+    maint:['Checar sensor do evaporador e carga do sistema de A/C.'],
+    op:['Reportar conforto térmico fora do normal.']
+  },
+  'Elétrico':{
+    control:['Avaliar abrangência: falha de comunicação pode mascarar outros alarmes.'],
+    maint:['Verificar tensão, aterramento e barramento CAN; FMI 9/19 = comunicação.','Procurar CIDs múltiplos no mesmo MID (suspeita de alimentação compartilhada).'],
+    op:['Reportar perda de instrumentos ou reinícios do painel.']
+  },
+  'Direção':{
+    control:['Prioridade de segurança; restringir o ativo até verificação.'],
+    maint:['Verificar pressão hidráulica de direção e sensores associados.'],
+    op:['Reportar direção pesada ou resposta lenta; parar em caso de perda.']
+  },
+  'Diferencial':{
+    control:['Avaliar restrição de carga; risco de dano ao conjunto eixo/diferencial.','Para filtro do diferencial: monitorar e programar inspeção.'],
+    maint:['Verificar pressão diferencial do filtro e nível/qualidade do óleo do diferencial.','Inspecionar temperatura e ruído do conjunto.'],
+    op:['Evitar arranque sob carga máxima em rampa.','Reportar ruído ou trepidação no eixo traseiro.']
+  },
+  'Pneus':{
+    control:['TKPH em alerta indica risco térmico do pneu — reduzir ciclo/velocidade.','Validar carga e pressão antes de liberar.'],
+    maint:['Conferir pressão, calibração de TKPH e histórico de carga.','Inspecionar sinais de superaquecimento do pneu.'],
+    op:['Respeitar velocidade em pista quente e carregada.','Reportar vibração ou aquecimento anormal do pneu.']
+  },
+  'Chassi':{
+    control:['Bias de chassi/quadro elevado indica distribuição irregular de carga — revisar carregamento.'],
+    maint:['Verificar sensores de bias do quadro e integridade estrutural.','Avaliar histórico de sobrecarga e impactos.'],
+    op:['Carregar de forma centralizada e uniforme.','Reportar trincas, ruídos estruturais ou inclinação anormal.']
+  },
+  'Não classificado':{
+    control:['Registrar e encaminhar para análise; sem protocolo específico.'],
+    maint:['Mapear o evento na referência FMI/CID/MID para classificar a causa.'],
+    op:['Reportar contexto em que o alarme apareceu.']
+  },
+  'Outros':{
+    control:['Avaliar caso a caso conforme severidade.'],
+    maint:['Diagnosticar pelo código no ET e referência FMI/CID/MID.'],
+    op:['Reportar sintomas observados.']
+  }
+};
+
+// Fluxo de designação das tratativas — fiel ao Mapa de Comunicação (Sala de Controle).
+// role: op=Operador, co=Controlador de Operação, cm=Controlador de Manutenção,
+//       sm=Supervisor/Técnico de Manutenção, dec=ponto de decisão.
+const ROLE_LABEL = {op:'Operador', co:'Controlador de Operação', cm:'Controlador de Manutenção', sm:'Supervisor/Técnico Manut.', dec:'Decisão'};
+const FLOWS = {
+  corretiva:[
+    {role:'op', act:'Informa falha, horímetro e local e aciona a sala de controle.', meta:'Rádio faixa 4'},
+    {role:'co', act:'Repassa ao Controlador de Manutenção (falha / local / horímetro).', meta:'Handoff'},
+    {role:'co', act:'Atualiza o despacho para corretiva.', meta:'MineStar / Smartmine'},
+    {role:'cm', act:'Aciona o Supervisor de Manutenção, abre Nota/OM e atualiza o despacho para corretiva.', meta:'Nota / OM'},
+    {role:'sm', act:'Informa diagnóstico e prazo de liberação ao Controlador de Manutenção.', meta:'SLA 20 min'},
+    {role:'cm', act:'Repassa no grupo de WhatsApp o prazo de liberação com o diagnóstico.', meta:'Grupo WhatsApp'},
+    {role:'cm', act:'Muda o status do equipamento somente quando ele chega à oficina.', meta:'Status'},
+    {role:'sm', act:'Executa a manutenção e, ao concluir, aciona a sala informando a liberação.', meta:'Liberação'},
+    {role:'cm', act:'Informa a operação e libera o equipamento no sistema.', meta:'MineStar / Smartmine'},
+    {role:'sm', act:'Repassa a OM preenchida à sala de controle.', meta:'OM concluída'}
+  ],
+  preventiva:[
+    {role:'cm', act:'Avisa o Controlador de Operação da parada para preventiva com antecedência.', meta:'SLA 6 h antes'},
+    {role:'co', act:'Aciona o Controlador de Manutenção e envia o equipamento para a oficina.', meta:'Handoff'},
+    {role:'co', act:'Altera o status no despacho para Manutenção Preventiva.', meta:'MineStar / Smartmine'},
+    {role:'sm', act:'Realiza a inspeção de entrada do equipamento.', meta:'Inspeção'},
+    {role:'dec', act:'Encontrou mais falhas na inspeção? Sim → atualizar previsão com o diagnóstico. Não → atualizar pela planilha de programação.', meta:'Decisão'},
+    {role:'cm', act:'Repassa no grupo de WhatsApp o prazo e as atividades (com detalhes da inspeção, se houver).', meta:'Grupo WhatsApp'},
+    {role:'sm', act:'Ao concluir, aciona a sala de controladores de manutenção informando a liberação.', meta:'Liberação'},
+    {role:'cm', act:'Informa a operação e altera o status para disponível.', meta:'Disponível'}
+  ]
+};
+const FLOW_OBS = 'As previsões devem ser registradas e divulgadas apenas pela sala de controle.';
+const state = { raw: [], data: [], ref: {}, refLoaded:false, charts: {}, seqWindowH: 72,
+  cidIndex: [], cidDesc: {}, midDict: {}, cidCache: {}, flowView:'corretiva' };
+const $ = id => document.getElementById(id);
+const els = {
+  fileInput:$('fileInput'), refInput:$('refInput'), btnUpload:$('btnUpload'), btnRef:$('btnRef'), btnHelp:$('btnHelp'),
+  closeHelp:$('closeHelp'), helpDialog:$('helpDialog'), themeToggle:$('themeToggle'),
+  selFrota:$('selFrota'), selMaq:$('selMaq'), selSistema:$('selSistema'), selNivel:$('selNivel'),
+  selOperador:$('selOperador'), selPeriodo:$('selPeriodo'), btnReset:$('btnReset'), btnSample:$('btnSample'),
+  btnExportCsv:$('btnExportCsv'), searchTable:$('searchTable'), scopePills:$('scopePills'),
+  selPlaybook:$('selPlaybook'), selSeqWindow:$('selSeqWindow'),
+  btnFlowCorr:$('btnFlowCorr'), btnFlowPrev:$('btnFlowPrev'), flowBox:$('flowBox'),
+  selTrat:$('selTrat'), fichaHead:$('fichaHead'), fichaFlow:$('fichaFlow'), fichaMsg:$('fichaMsg'),
+  btnCopyMsg:$('btnCopyMsg'), copyOk:$('copyOk')
+};
+
+/* ===================== HELPERS ===================== */
+function parseDateBR(s=''){
+  const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+  if(!m) return null;
+  return new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0), +(m[6]||0));
+}
+function fmtDate(d){return d ? d.toLocaleString('pt-BR') : '—';}
+function fmtHours(h){
+  if(h==null||!isFinite(h)) return '—';
+  if(h<48) return h.toFixed(1)+'h';
+  return (h/24).toFixed(1)+'d';
+}
+function daysDiff(a,b){return Math.max(0,(a-b)/(864e5));}
+function hoursDiff(a,b){return (a-b)/(36e5);}
+function uniq(v){return [...new Set(v.filter(x=>x!==''&&x!=null))].sort((a,b)=>String(a).localeCompare(String(b),'pt-BR'));}
+function median(arr){if(!arr.length)return null;const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function groupBy(arr,fn){return arr.reduce((m,x)=>{const k=fn(x);(m[k]||=[]).push(x);return m;},{});}
+function optionize(select,arr,label='Todos'){
+  select.innerHTML='';
+  [label,...arr].forEach(v=>{const op=document.createElement('option');op.value=v===label?'':v;op.textContent=v;select.appendChild(op);});
+}
+function getCss(v){return getComputedStyle(document.body).getPropertyValue(v).trim();}
+function setText(id,t){const e=$(id);if(e)e.textContent=t;}
+function setHtml(id,h){const e=$(id);if(e)e.innerHTML=h;}
+function badgeNivel(n){return `<span class="badge ${levelClass(n)}">${levelLabel(n)}</span>`;}
+function normRefKey(s=''){return s.toLowerCase().trim();}
+
+/* ===================== ENRICH / NORMALIZE ===================== */
+// Casa um texto de alarme (inglês) ao CID por sobreposição de tokens (alta precisão).
+function matchCid(text=''){
+  if(!state.cidIndex.length) return {cid:null, cidDesc:null};
+  const key = text.toLowerCase();
+  if(state.cidCache[key]!==undefined) return state.cidCache[key];
+  const ct = cidTokens(cleanForMatch(text));
+  let best=null, bj=0;
+  if(ct.size){
+    state.cidIndex.forEach(e=>{
+      let inter=0; e.tokens.forEach(t=>{ if(ct.has(t)) inter++; });
+      if(!inter) return;
+      const uni = new Set([...ct, ...e.tokens]).size;
+      const jac = inter/uni;
+      if(jac>bj){ bj=jac; best=e; }
+    });
+  }
+  const res = (best && bj>=0.6) ? {cid:best.num, cidDesc:best.desc} : {cid:null, cidDesc:null};
+  state.cidCache[key]=res; return res;
+}
+function midProvavel(sistema){ return state.refLoaded && SYS_MID[sistema] ? SYS_MID[sistema] : null; }
+
+function enrich(d){
+  const m = matchCid(d.original);
+  d.cid = m.cid; d.cidDesc = m.cidDesc;
+  d.mid = midProvavel(d.sistema);       // inferido por sistema (provável)
+  // fmi fica no nível do evento: só se a base de eventos trouxer (não há nestes dados)
+}
+function normalizeRow(r){
+  const original = (r['Descrição do alarme'] || r['Descricao do alarme'] || '').trim();
+  const date = parseDateBR(r['Data da Ocorrência_'] || r['Data da Ocorrencia_'] || r['Data'] || '');
+  const nivel = Number(r['Nível do evento'] || r['Nivel do evento'] || r['Nível'] || r['Nivel'] || 2) || 2;
+  const c = canonicalize(original);
+  const fmiRaw = r['FMI']??r['Fmi']??r['fmi'];
+  const d = {
+    frota:(r['Frota']||'').trim(),
+    maq:(r['Máquina']||r['Maquina']||'').trim(),
+    date, original, nivel,
+    component:c.component,
+    sistema: (r['Sistema'] && String(r['Sistema']).trim()) ? (normalizeSistema(r['Sistema']) || c.sistema) : c.sistema,
+    operador:(r['Operador']||'').trim() || 'Não informado',
+    tag:(r['TAG']||'').trim(),
+    cid:null, cidDesc:null, fmi:(fmiRaw===''||fmiRaw==null)?null:Number(fmiRaw), mid:null
+  };
+  enrich(d);
+  return d;
+}
+function applyRefToData(){ state.cidCache={}; state.raw.forEach(enrich); }
+
+/* ===================== SAMPLE ===================== */
+function sampleData(){
+  const a=[
+    ['CAT_785C','785_08','01/05/2026 07:10:00','Cylinder #11 Injector alarm',2,'Carlos','CB16'],
+    ['CAT_785C','785_08','01/05/2026 09:32:00','Inj-Cyl 11 sensor fault',2,'Carlos','CB16'],
+    ['CAT_785C','785_08','02/05/2026 11:20:00','Cylinder #11 Injector alarm',2,'Mateus','CB16'],
+    ['CAT_785C','785_05','02/05/2026 12:10:00','Transmission Output Speed Sensor alarm',2,'Mateus','CB22'],
+    ['CAT_785C','785_05','03/05/2026 14:20:00','Tran Out Speed sensor fault',3,'Renato','CB22'],
+    ['CAT_785C','785_13','03/05/2026 14:50:00','Brake Oil Diverter Solenoid alarm',2,'Renato','CB30'],
+    ['CAT_777G','777_03','04/05/2026 08:15:00','Air Fltr alarm',1,'Ana','CB16'],
+    ['CAT_785C','785_08','04/05/2026 10:30:00','Cylinder #11 Injector alarm',2,'Ana','CB16'],
+    ['CAT_785C','785_05','05/05/2026 05:50:00','Tran Out Speed sensor fault',3,'Carlos','CB22'],
+    ['CAT_993K','993_01','05/05/2026 16:00:00','Parking Brake Pressure Switch alarm',1,'Daniel','CB40']
+  ];
+  return a.map(r=>normalizeRow({Frota:r[0],'Máquina':r[1],'Data da Ocorrência_':r[2],'Descrição do alarme':r[3],'Nível do evento':r[4],Operador:r[5],TAG:r[6]}));
+}
+
+/* ===================== FILTERS ===================== */
+function hydrateControls(){
+  optionize(els.selFrota, uniq(state.raw.map(d=>d.frota)));
+  optionize(els.selSistema, uniq(state.raw.map(d=>d.sistema)));
+  optionize(els.selOperador, uniq(state.raw.map(d=>d.operador)));
+  optionize(els.selNivel, ['3','2','1']);
+  optionize(els.selPeriodo, ['24h','7d','30d']);
+  syncMachineOptions();
+}
+function syncMachineOptions(){
+  const subset = state.raw.filter(d=>!els.selFrota.value || d.frota===els.selFrota.value);
+  optionize(els.selMaq, uniq(subset.map(d=>d.maq)));
+}
+function maxDate(arr){return arr.reduce((m,d)=> d.date && d.date>m ? d.date : m, new Date(0));}
+function applyFilters(){
+  const now = maxDate(state.raw);
+  state.data = state.raw.filter(d=>{
+    if(els.selFrota.value && d.frota!==els.selFrota.value) return false;
+    if(els.selMaq.value && d.maq!==els.selMaq.value) return false;
+    if(els.selSistema.value && d.sistema!==els.selSistema.value) return false;
+    if(els.selNivel.value && String(d.nivel)!==els.selNivel.value) return false;
+    if(els.selOperador.value && d.operador!==els.selOperador.value) return false;
+    if(els.selPeriodo.value){
+      const lim={'24h':1,'7d':7,'30d':30}[els.selPeriodo.value]||9999;
+      if(!d.date || daysDiff(now,d.date)>lim) return false;
+    }
+    return true;
+  }).sort((a,b)=>(b.date||0)-(a.date||0));
+  renderScope(); renderAll();
+}
+function renderScope(){
+  const p=[];
+  if(els.selFrota.value)p.push('Frota: '+els.selFrota.value);
+  if(els.selMaq.value)p.push('Máquina: '+els.selMaq.value);
+  if(els.selSistema.value)p.push('Sistema: '+els.selSistema.value);
+  if(els.selNivel.value)p.push('Nível: '+levelLabel(els.selNivel.value));
+  if(els.selOperador.value)p.push('Operador: '+els.selOperador.value);
+  if(els.selPeriodo.value)p.push('Período: '+els.selPeriodo.value);
+  els.scopePills.innerHTML = p.length ? p.map(x=>`<span class="pill">${x}</span>`).join('') : '<span class="pill">Sem filtros ativos</span>';
+}
+
+/* ===================== STATS ===================== */
+function machineStats(data){
+  const now = maxDate(data);
+  return Object.entries(groupBy(data,d=>d.maq)).map(([maq,rows])=>{
+    const n3=rows.filter(r=>r.nivel===3).length, n2=rows.filter(r=>r.nivel===2).length, n1=rows.filter(r=>r.nivel===1).length;
+    const distinct=new Set(rows.map(r=>r.component)).size;
+    const latest=maxDate(rows);
+    const recency=Math.max(0,15-Math.min(15,daysDiff(now,latest)));
+    const score=n3*9+n2*4+n1+distinct*1.5+recency;
+    return {maq,frota:rows[0]?.frota||'',total:rows.length,n3,n2,n1,distinct,latest,score:+score.toFixed(1)};
+  }).sort((a,b)=>b.score-a.score);
+}
+function systemStats(data){
+  return Object.entries(groupBy(data,d=>d.sistema)).map(([s,rows])=>({
+    sistema:s,total:rows.length,n3:rows.filter(r=>r.nivel===3).length,n2:rows.filter(r=>r.nivel===2).length,n1:rows.filter(r=>r.nivel===1).length,
+    peso:rows.reduce((a,r)=>a+(severityWeight[r.nivel]||1),0)
+  })).sort((a,b)=>b.peso-a.peso);
+}
+function dominantLevel(rows){const c=groupBy(rows,r=>r.nivel);return Object.keys(c).map(Number).sort((a,b)=>c[b].length-c[a].length)[0];}
+function componentStats(data){
+  const total=data.length||1;
+  return Object.entries(groupBy(data,d=>d.component)).map(([comp,rows])=>{
+    const ref=rows.find(r=>r.cid!=null)||{};
+    const fmiRow=rows.find(r=>r.fmi!=null)||{};
+    return {component:comp, sistema:rows[0].sistema, count:rows.length, machines:new Set(rows.map(r=>r.maq)).size,
+      niv:dominantLevel(rows), share:rows.length/total*100,
+      cid:ref.cid??null, cidDesc:ref.cidDesc??null, fmi:fmiRow.fmi??null, mid:rows[0].mid??null};
+  }).sort((a,b)=>b.count-a.count);
+}
+function operatorStats(data){
+  return Object.entries(groupBy(data,d=>d.operador)).map(([op,rows])=>({
+    operador:op,count:rows.length,machines:new Set(rows.map(r=>r.maq)).size,peso:rows.reduce((a,r)=>a+(severityWeight[r.nivel]||1),0)
+  })).sort((a,b)=>b.peso-a.peso);
+}
+function trendData(data){
+  const g=groupBy(data,d=>d.date?d.date.toLocaleDateString('pt-BR'):'Sem data');
+  return Object.entries(g).map(([d,rows])=>({date:d,count:rows.length})).sort((a,b)=>{
+    const pa=a.date.split('/').reverse().join('-'),pb=b.date.split('/').reverse().join('-');return pa.localeCompare(pb);
+  });
+}
+
+/* ===================== PREDIÇÃO ===================== */
+// Colapsa rajadas: eventos do mesmo (máquina, componente) separados por menos de
+// EPISODE_GAP minutos viram um único "episódio" (flare-up), representado pelo 1º evento.
+// Sem isso, alarmes em storm (ex.: injetor disparando milhares de vezes/min) dão
+// intervalo ~0 e poluem as sequências. Predição precisa de flare-ups distintos.
+const EPISODE_GAP_MIN = 30;
+function collapseEpisodes(data, gapMin=EPISODE_GAP_MIN){
+  const byKey = groupBy(data.filter(d=>d.date), d=>d.maq+'|||'+d.component);
+  const eps=[];
+  Object.values(byKey).forEach(rows=>{
+    const s=[...rows].sort((a,b)=>a.date-b.date);
+    let prev=null;
+    s.forEach(r=>{
+      if(prev===null || (r.date-prev)/60000 > gapMin){ eps.push(r); }
+      prev=r.date;
+    });
+  });
+  return eps;
+}
+// Mineração de transições A->B na mesma máquina, entre EPISÓDIOS, dentro da janela.
+function mineSequences(data,windowH){
+  const eps=collapseEpisodes(data);
+  const byMaq=groupBy(eps,d=>d.maq);
+  const trans={}; // "A|||B" -> {count, machines:Set, leads:[]}
+  Object.values(byMaq).forEach(rows=>{
+    const ev=[...rows].sort((a,b)=>a.date-b.date);
+    for(let i=0;i<ev.length;i++){
+      for(let j=i+1;j<ev.length;j++){
+        const dh=hoursDiff(ev[j].date,ev[i].date);
+        if(dh<=0) continue;
+        if(dh>windowH) break;
+        if(ev[i].component===ev[j].component) continue;
+        const k=ev[i].component+'|||'+ev[j].component;
+        (trans[k]||={count:0,machines:new Set(),leads:[]});
+        trans[k].count++; trans[k].machines.add(ev[i].maq); trans[k].leads.push(dh);
+      }
+    }
+  });
+  return Object.entries(trans).map(([k,v])=>{
+    const [a,b]=k.split('|||');
+    return {a,b,count:v.count,machines:v.machines.size,lead:median(v.leads)};
+  }).filter(t=>t.count>=3).sort((x,y)=> (y.machines-x.machines) || (y.count-x.count)).slice(0,25);
+}
+// Recorrência por (máquina, componente), medida entre EPISÓDIOS (flare-ups distintos).
+function recurrenceStats(data){
+  const now=maxDate(data);
+  const eps=collapseEpisodes(data);
+  const g=groupBy(eps,d=>d.maq+'|||'+d.component);
+  return Object.entries(g).map(([k,rows])=>{
+    const [maq,comp]=k.split('|||');
+    const dates=rows.map(r=>r.date).sort((a,b)=>a-b);
+    if(dates.length<4) return null;
+    const intervals=[]; for(let i=1;i<dates.length;i++) intervals.push(hoursDiff(dates[i],dates[i-1]));
+    const med=median(intervals);
+    const half=Math.floor(intervals.length/2);
+    const early=intervals.slice(0,half), late=intervals.slice(half);
+    const meanE=early.reduce((a,b)=>a+b,0)/(early.length||1), meanL=late.reduce((a,b)=>a+b,0)/(late.length||1);
+    let trend='estável';
+    if(intervals.length>=4){ if(meanL<meanE*0.7) trend='acelerando'; else if(meanL>meanE*1.4) trend='desacelerando'; }
+    const last=dates[dates.length-1];
+    const nextEst=med!=null ? new Date(last.getTime()+med*36e5) : null;
+    const sinceLast=hoursDiff(now,last);
+    let status='estável';
+    if(med!=null){
+      if(sinceLast>=med) status='vencido';
+      else if((med-sinceLast)<=med*0.4 || trend==='acelerando') status='iminente';
+    }
+    return {maq,component:comp,sistema:rows[0].sistema,count:dates.length,med,trend,last,nextEst,status};
+  }).filter(Boolean).sort((a,b)=>{
+    const rank={iminente:0,vencido:1,'estável':2};
+    return (rank[a.status]-rank[b.status]) || (a.med-b.med);
+  });
+}
+
+
+/* ===================== AÇÕES / CONFIANÇA / SEMÁFORO ===================== */
+const CRITICAL_SYSTEMS = new Set(['Freios','Direção','Transmissão','Motor']);
+const SAFETY_SYSTEMS = new Set(['Freios','Direção']);
+function confidenceForRec(r){
+  if(!r || !r.count) return {level:'Baixa', cls:'conf-baixa', reason:'histórico insuficiente'};
+  if(r.count>=8 && (r.trend==='acelerando' || r.status!=='estável')) return {level:'Alta', cls:'conf-alta', reason:`${r.count} episódios e tendência ${r.trend}`};
+  if(r.count>=6) return {level:'Média', cls:'conf-media', reason:`${r.count} episódios`};
+  return {level:'Baixa', cls:'conf-baixa', reason:`apenas ${r.count} episódios`};
+}
+function fmiMaintenanceAction(fmi){
+  const map={
+    3:'Verificar alimentação, curto para positivo e integridade do chicote.',
+    4:'Verificar curto para terra, aterramento e queda de tensão.',
+    5:'Verificar circuito aberto, conector solto, terminal rompido ou sensor desconectado.',
+    6:'Verificar curto, corrente alta e componente travado/solenoide em falha.',
+    9:'Verificar barramento CAN, terminação, alimentação de ECM e comunicação.',
+    12:'Confirmar componente/módulo defeituoso antes da troca.',
+    13:'Executar calibração e validar parâmetro após ajuste.',
+    19:'Verificar erro de dado recebido pela rede, CAN e módulo emissor.'
+  };
+  return map[fmi] || 'Diagnosticar pelo ET/VIMS, validar CID/FMI e confirmar sintoma antes de trocar componente.';
+}
+function actionRecommendation(ctx){
+  const nivel=ctx.nivel??2, sistema=ctx.sistema||'Outros', rec=ctx.rec||null, n3=ctx.n3||0, count=ctx.count||1, fmi=ctx.fmi;
+  let action='Monitorar', cls='ac-monitorar', op='Continuar operando monitorado', maint='Registrar e acompanhar tendência', pcm='Sem programação imediata', risk='Baixo';
+  if(nivel===3 && SAFETY_SYSTEMS.has(sistema)){
+    action='Parar / restringir imediatamente'; cls='ac-parar'; risk='Crítico'; op='Parar em local seguro; não operar em rampa'; maint='Diagnóstico imediato do sistema de segurança'; pcm='Abrir corretiva e acompanhar liberação';
+  } else if(nivel===3 || (rec && rec.status==='vencido')){
+    action='Inspecionar imediatamente'; cls='ac-inspecionar'; risk='Alto'; op=CRITICAL_SYSTEMS.has(sistema)?'Operar restrito até avaliação':'Evitar forçar o equipamento'; maint='Verificar códigos ativos, chicote/conector e condição do componente'; pcm='Priorizar no turno';
+  } else if(rec && rec.status==='iminente'){
+    action='Inspecionar no turno'; cls='ac-inspecionar'; risk='Alto'; op=CRITICAL_SYSTEMS.has(sistema)?'Reduzir exposição operacional':'Operar com alerta'; maint='Atuar antes do próximo flare-up estimado'; pcm='Programar janela curta';
+  } else if(count>=4 || (rec && rec.count>=4)){
+    action='Programar preventiva'; cls='ac-programar'; risk='Médio'; op='Manter operação monitorada'; maint='Inspecionar na próxima janela e confirmar reincidência'; pcm='Programar inspeção preventiva';
+  }
+  if(fmi!=null){ maint = fmiMaintenanceAction(fmi); }
+  return {action,cls,op,maint,pcm,risk};
+}
+function trafficFor(text){
+  if(text==='Crítico'||text==='Alto') return {sym:text==='Crítico'?'P':'R', cls:'tr-red'};
+  if(text==='Médio') return {sym:'A', cls:'tr-amber'};
+  return {sym:'M', cls:'tr-green'};
+}
+function buildTopActions(data){
+  const recs=recurrenceStats(data);
+  const recMap=new Map(recs.map(r=>[r.maq+'|||'+r.component,r]));
+  const by=groupBy(data,d=>d.maq+'|||'+d.component);
+  return Object.entries(by).map(([k,rows])=>{
+    const [maq,component]=k.split('|||');
+    const sistema=rows[0].sistema;
+    const n3=rows.filter(r=>r.nivel===3).length;
+    const maxNivel=Math.max(...rows.map(r=>r.nivel));
+    const rec=recMap.get(k);
+    const fmiRow=rows.find(r=>r.fmi!=null);
+    const act=actionRecommendation({nivel:maxNivel,sistema,rec,n3,count:rows.length,fmi:fmiRow?.fmi});
+    const conf=confidenceForRec(rec);
+    const riskWeight={Crítico:100,Alto:70,Médio:35,Baixo:10}[act.risk]||10;
+    const score=riskWeight + n3*12 + rows.length + (rec?.trend==='acelerando'?18:0) + (CRITICAL_SYSTEMS.has(sistema)?10:0);
+    return {maq,component,sistema,count:rows.length,n3,maxNivel,rec,act,conf,score,latest:maxDate(rows)};
+  }).sort((a,b)=>b.score-a.score || b.latest-a.latest).slice(0,20);
+}
+function renderActionChip(a){ return `<span class="action-chip ${a.cls}">${a.action}</span>`; }
+function renderTraffic(risk){ const t=trafficFor(risk); return `<span class="traffic ${t.cls}" title="${risk}">${t.sym}</span><span class="sla">${risk}</span>`; }
+
+/* ===================== DIAGNÓSTICO (causa-raiz) ===================== */
+function rootCausePatterns(data){
+  const out=[];
+  // 1) Componente dominante por máquina
+  const ms=machineStats(data);
+  if(ms[0]){
+    const top=ms[0];
+    const comps=componentStats(data.filter(d=>d.maq===top.maq));
+    if(comps[0] && comps[0].count/top.total>0.5){
+      out.push({type:'red',title:`Falha dominante — ${top.maq}`,
+        text:`${comps[0].component} responde por ${(comps[0].count/top.total*100).toFixed(0)}% dos eventos da máquina (${comps[0].count} de ${top.total}). Tratar como ação prioritária de manutenção.`});
+    }
+  }
+  // 2) Concentração de N3 em um componente
+  const n3=data.filter(d=>d.nivel===3);
+  if(n3.length){
+    const c=componentStats(n3)[0];
+    out.push({type:'amber',title:'Driver dos eventos N3',
+      text:`${c.component} concentra ${c.count} dos ${n3.length} eventos N3 do recorte, em ${c.machines} máquina(s).`});
+  }
+  // 3) Regras dependentes de FMI/CID/MID
+  if(state.refLoaded){
+    const total=new Set(data.map(d=>d.component)).size||1;
+    const comCid=new Set(data.filter(d=>d.cid!=null).map(d=>d.component)).size;
+    out.push({type:'green',title:'Camada CID ativa',
+      text:`${comCid} de ${total} componentes do recorte casaram com um CID por descrição. MID por sistema é provável (~). Regras de barramento/CAN aguardam FMI no nível do evento.`});
+    // múltiplos FMI no mesmo CID, mesma máquina => fiação/curto (só com FMI por evento)
+    const byMaqCid=groupBy(data.filter(d=>d.cid!=null&&d.fmi!=null),d=>d.maq+'|'+d.cid);
+    Object.entries(byMaqCid).forEach(([k,rows])=>{
+      const fmis=new Set(rows.map(r=>r.fmi));
+      if(fmis.has(3)&&fmis.has(4)){
+        const [maq,cid]=k.split('|');
+        out.push({type:'purple',title:`Suspeita de curto/abertura — ${maq}`,
+          text:`CID ${cid} apresenta FMI 3 e 4 simultâneos (tensão alta e baixa) — típico de problema de fiação/conector ou alimentação compartilhada.`});
+      }
+    });
+    data.filter(d=>d.fmi===9||d.fmi===19).slice(0,3).forEach(d=>{
+      out.push({type:'blue',title:`Falha de comunicação (CAN) — ${d.maq}`,
+        text:`CID ${d.cid} com FMI ${d.fmi}: ${FMI_DICT[d.fmi]}. Verificar barramento CAN e o ECM do sistema ${d.sistema}.`});
+    });
+  } else {
+    out.push({type:'blue',title:'Camada CID/FMI/MID inativa',
+      text:'Carregue os dicionários CID, FMI e MID para casar componentes ao CID e habilitar as regras de barramento/CAN.'});
+  }
+  return out.slice(0,8);
+}
+
+/* ===================== CHARTS / RENDER ===================== */
+function makeChart(id,cfg){const ctx=$(id);if(!ctx)return;if(state.charts[id])state.charts[id].destroy();state.charts[id]=new Chart(ctx,cfg);}
+const axisOpt = ()=>({x:{ticks:{color:getCss('--muted')}},y:{ticks:{color:getCss('--muted')}}});
+
+function renderKPIs(data){
+  const n3=data.filter(d=>d.nivel===3).length,n2=data.filter(d=>d.nivel===2).length,n1=data.filter(d=>d.nivel===1).length;
+  const ms=machineStats(data); const avg=ms.length?(ms.reduce((a,b)=>a+b.score,0)/ms.length).toFixed(1):'0';
+  setText('kpiTotal',data.length);setText('kpiN3',n3);setText('kpiN2',n2);setText('kpiN1',n1);setText('kpiScore',avg);
+  setText('kpiTotalSub',`${new Set(data.map(d=>d.maq)).size} máquinas no recorte`);
+  setText('kpiN3Sub',`${data.length?(n3/data.length*100).toFixed(1):'0'}% do volume`);
+  setText('kpiN2Sub',`${data.length?(n2/data.length*100).toFixed(1):'0'}% do volume`);
+  setText('kpiN1Sub',`${data.length?(n1/data.length*100).toFixed(1):'0'}% do volume`);
+  setText('kpiScoreSub',`${ms.length} ativos avaliados`);
+  const latest=maxDate(data);
+  setText('lastUpdate',latest.getTime()?fmtDate(latest):'—');
+  setText('coverage',`${new Set(data.map(d=>d.frota)).size} frotas · ${new Set(data.map(d=>d.maq)).size} ativos`);
+  setText('criticalMachines',ms.filter(m=>m.score>=20).length);
+  if(state.refLoaded){
+    const total=new Set(data.map(d=>d.component)).size||1;
+    const comCid=new Set(data.filter(d=>d.cid!=null).map(d=>d.component)).size;
+    setText('refStat', `CID ${comCid}/${total} comp · MID/FMI dic.`);
+  } else setText('refStat','Aguardando referência');
+}
+function renderExecutive(data){
+  const sys=systemStats(data).slice(0,8);
+  makeChart('chartSistema',{type:'bar',data:{labels:sys.map(x=>x.sistema),datasets:[{label:'Peso crítico',data:sys.map(x=>x.peso),backgroundColor:'#ffcd11'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:axisOpt()}});
+  const tr=trendData(data);
+  makeChart('chartTrend',{type:'line',data:{labels:tr.map(x=>x.date),datasets:[{label:'Ocorrências',data:tr.map(x=>x.count),borderColor:'#5aa9ff',backgroundColor:'rgba(90,169,255,.15)',fill:true,tension:.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:axisOpt()}});
+  const alerts=rootCausePatterns(data);
+  setHtml('alertsBox',alerts.length?alerts.map(a=>`<div class="alert ${a.type}"><strong>${a.title}:</strong> ${a.text}</div>`).join(''):'<div class="alert blue"><strong>Sem sinais:</strong> carregue uma base ou amplie o recorte.</div>');
+  const top=machineStats(data).slice(0,6);
+  setHtml('machineSummary',top.length?top.map(m=>`<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px"><strong>${m.maq}</strong><span>${m.score}</span></div><div style="font-size:12px;color:var(--muted);margin:4px 0 6px">${m.frota} · N3 ${m.n3} · N2 ${m.n2} · N1 ${m.n1}</div><div class="progress"><div style="width:${Math.min(100,m.score*2)}%"></div></div></div>`).join(''):'<div class="hint">Sem dados.</div>');
+}
+function renderAssets(data){
+  const top=machineStats(data).slice(0,10);
+  makeChart('chartMachines',{type:'bar',data:{labels:top.map(x=>x.maq),datasets:[{label:'Score',data:top.map(x=>x.score),backgroundColor:'#b38cff'}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:axisOpt()}});
+  setHtml('tbMachines',top.map(m=>{
+    const rows=data.filter(d=>d.maq===m.maq);
+    const comp=componentStats(rows)[0];
+    const maxNivel=Math.max(...rows.map(r=>r.nivel));
+    const rec=recurrenceStats(data).find(r=>r.maq===m.maq && r.component===comp?.component);
+    const fmiRow=rows.find(r=>r.fmi!=null);
+    const act=actionRecommendation({nivel:maxNivel,sistema:comp?.sistema||rows[0]?.sistema,rec,n3:m.n3,count:rows.length,fmi:fmiRow?.fmi});
+    return `<tr><td><strong>${m.maq}</strong></td><td>${m.frota}</td><td class="num">${m.score}</td><td class="num">${m.n3}</td><td class="num">${m.n2}</td><td class="num">${m.n1}</td><td>${fmtDate(m.latest)}</td><td>${renderActionChip(act)}<span class="sla">${comp?comp.component:'Sem componente dominante'}</span></td><td>${act.op}</td><td>${act.maint}</td></tr>`;
+  }).join('')||'<tr><td colspan="10">Sem dados.</td></tr>');
+}
+function renderDiagnostico(data){
+  const rc=rootCausePatterns(data);
+  setHtml('rootCauseBox',rc.length?rc.map(a=>`<div class="alert ${a.type}"><strong>${a.title}:</strong> ${a.text}</div>`).join(''):'<div class="alert blue">Sem padrões no recorte.</div>');
+  const cs=componentStats(data).slice(0,40);
+  setHtml('tbComponentes',cs.map(c=>`<tr><td><strong>${c.component}</strong>${c.cidDesc?`<div style="font-size:11px;color:var(--faint)">${c.cidDesc}</div>`:''}</td><td><span class="badge tag-sys">${c.sistema}</span></td><td>${c.cid??'—'}</td><td>${c.fmi!=null?`${c.fmi}`:'—'}</td><td>${c.mid?`~${c.mid}`:'—'}</td><td class="num">${c.count}</td><td class="num">${c.machines}</td><td>${badgeNivel(c.niv)}</td></tr>`).join('')||'<tr><td colspan="8">Sem dados.</td></tr>');
+}
+function renderPredicao(data){
+  setText('seqWindow', state.seqWindowH>=168?'7 dias':state.seqWindowH+'h');
+  const seq=mineSequences(data,state.seqWindowH);
+  setHtml('tbSeq',seq.length?seq.map(s=>`<tr><td>${s.a}</td><td>${s.b}</td><td class="num">${s.count}</td><td class="num">${s.machines}</td><td>${fmtHours(s.lead)}</td></tr>`).join(''):'<tr><td colspan="5">Nenhuma sequência recorrente no recorte/janela.</td></tr>');
+  const rec=recurrenceStats(data).slice(0,60);
+  const stClass={iminente:'st-iminente',vencido:'st-vencido','estável':'st-estavel'};
+  const trClass={acelerando:'dot red',desacelerando:'dot green','estável':'dot amber'};
+  setHtml('tbRecorrencia',rec.length?rec.map(r=>{
+    const rows=data.filter(d=>d.maq===r.maq && d.component===r.component);
+    const maxNivel=rows.length?Math.max(...rows.map(x=>x.nivel)):2;
+    const fmiRow=rows.find(x=>x.fmi!=null);
+    const conf=confidenceForRec(r);
+    const act=actionRecommendation({nivel:maxNivel,sistema:r.sistema,rec:r,count:r.count,fmi:fmiRow?.fmi});
+    return `<tr><td><strong>${r.maq}</strong></td><td>${r.component}</td><td class="num">${r.count}</td><td>${fmtHours(r.med)}</td><td><span class="${trClass[r.trend]||'dot amber'}"></span> ${r.trend}</td><td>${fmtDate(r.last)}</td><td>${fmtDate(r.nextEst)}</td><td><span class="status-chip ${stClass[r.status]||'st-na'}">${r.status}</span></td><td><span class="status-chip ${conf.cls}">${conf.level}</span><span class="sla">${conf.reason}</span></td><td>${renderActionChip(act)}</td></tr>`;
+  }).join(''):'<tr><td colspan="10">Sem componentes com histórico suficiente (mínimo 4 ocorrências por máquina).</td></tr>');
+}
+
+function renderActions(data){
+  const actions=buildTopActions(data);
+  setHtml('tbTopAcoes',actions.length?actions.map((a,i)=>`<tr><td class="num"><strong>${i+1}</strong></td><td><strong>${a.maq}</strong></td><td><span class="badge tag-sys">${a.sistema}</span></td><td>${a.component}<span class="sla">${a.count} ocorrência(s) · N3 ${a.n3}${a.rec?` · próx. ${fmtDate(a.rec.nextEst)}`:''}</span></td><td>${renderTraffic(a.act.risk)}</td><td><span class="status-chip ${a.conf.cls}">${a.conf.level}</span><span class="sla">${a.conf.reason}</span></td><td>${renderActionChip(a.act)}</td><td>${a.act.op}</td><td>${a.act.maint}</td><td>${a.act.pcm}</td></tr>`).join(''):'<tr><td colspan="10">Sem dados suficientes para gerar ações.</td></tr>');
+  const rules=[
+    ['red','N3 em freio/direção','Parar ou restringir imediatamente; não liberar em rampa sem avaliação.'],
+    ['amber','N2 recorrente','Três ou mais eventos no mesmo componente em 24h devem gerar inspeção no turno.'],
+    ['amber','Tendência acelerando','Quando o intervalo entre episódios cai, a inspeção deve ser antecipada.'],
+    ['blue','FMI 9/19','Tratar como comunicação/CAN antes de trocar sensor.'],
+    ['purple','Mesmo alarme em várias máquinas','Avaliar causa sistêmica: operação, pista, preventiva, lote de peça ou configuração.']
+  ];
+  setHtml('rulesBox',rules.map(r=>`<div class="alert ${r[0]}"><strong>${r[1]}:</strong> ${r[2]}</div>`).join(''));
+  const fmis=[3,4,5,6,9,12,13,19];
+  setHtml('tbFmiGuide',fmis.map(f=>`<tr><td><strong>FMI ${f}</strong></td><td>${FMI_DICT[f]||'—'}</td><td>${fmiMaintenanceAction(f)}</td></tr>`).join(''));
+}
+
+function renderPlaybooks(data){
+  const comps=componentStats(data);
+  const cur=els.selPlaybook.value;
+  optionize(els.selPlaybook, comps.map(c=>c.component), comps.length?'— selecione —':'Sem dados');
+  if(cur && comps.some(c=>c.component===cur)) els.selPlaybook.value=cur;
+  else if(comps[0]) els.selPlaybook.value=comps[0].component;
+  drawPlaybook(data);
+}
+function drawPlaybook(data){
+  const comp=els.selPlaybook.value;
+  const rows=data.filter(d=>d.component===comp);
+  if(!comp || !rows.length){setHtml('playbookHead','<div class="hint">Selecione um componente.</div>');setHtml('playbookGrid','');return;}
+  const sis=rows[0].sistema; const pb=PLAYBOOKS[sis]||PLAYBOOKS['Outros'];
+  const niv=dominantLevel(rows); const maqs=new Set(rows.map(r=>r.maq)).size;
+  const ref=rows.find(r=>r.cid!=null);
+  const fmiTxt=ref&&ref.fmi!=null?` · FMI ${ref.fmi} (${FMI_DICT[ref.fmi]||'—'})`:'';
+  const cidTxt=ref?` · CID ${ref.cid}${ref.cidDesc?` (${ref.cidDesc})`:''}`:'';
+  const midTxt=rows[0].mid?` · MID ~${rows[0].mid}${state.midDict[rows[0].mid]?` (${state.midDict[rows[0].mid]})`:''}`:'';
+  setHtml('playbookHead',`<div class="pill-row"><span class="badge tag-comp">${comp}</span><span class="badge tag-sys">${sis}</span>${badgeNivel(niv)}<span class="pill">${rows.length} ocorrências · ${maqs} máquina(s)${cidTxt}${midTxt}${fmiTxt}</span></div>`);
+  const card=(cls,tag,title,items)=>`<div class="pb-card ${cls}"><h4><span class="pb-tag">${tag}</span> ${title}</h4><ul>${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
+  setHtml('playbookGrid',
+    card('pb-control','Sala de controle','Resposta imediata',pb.control)+
+    card('pb-maint','Manutenção','Diagnóstico técnico',pb.maint)+
+    card('pb-op','Operação','Orientação ao operador',pb.op)
+  );
+}
+function renderTimeline(data){
+  const td=els.selMaq.value?data.filter(d=>d.maq===els.selMaq.value):data.slice(0,25);
+  setHtml('timelineBox',td.length?td.map(d=>`<div class="timeline-item"><div class="timeline-top"><div><div>${badgeNivel(d.nivel)} <strong style="margin-left:8px">${d.component}</strong></div><div class="timeline-meta">${fmtDate(d.date)} · ${d.maq} · ${d.sistema} · ${d.operador}${d.cid!=null?` · CID ${d.cid}/FMI ${d.fmi}`:''}</div></div><div class="badge soft">${d.tag||'Sem TAG'}</div></div><div class="timeline-desc">${d.original}</div></div>`).join(''):'<div class="timeline-item">Sem eventos para o recorte.</div>');
+}
+/* ===================== TRATATIVAS ===================== */
+const ROLE_CLASS={op:'role-op',co:'role-co',cm:'role-cm',sm:'role-sm',dec:'role-dec'};
+function renderFlow(){
+  els.btnFlowCorr.classList.toggle('primary', state.flowView==='corretiva');
+  els.btnFlowPrev.classList.toggle('primary', state.flowView==='preventiva');
+  const steps=FLOWS[state.flowView]||[];
+  els.flowBox.innerHTML = `<div class="flow">${steps.map(s=>`<div class="flow-step ${s.role==='dec'?'dec':''}"><span class="flow-role ${ROLE_CLASS[s.role]}">${ROLE_LABEL[s.role]}</span><div><div class="flow-act">${s.act}</div><span class="flow-meta">${s.meta}</span></div></div>`).join('')}</div><div class="note" style="margin-top:12px">Obs: ${FLOW_OBS}</div>`;
+}
+function suggestPath(niv, rec){
+  if(niv===3 || (rec && rec.status==='iminente')) return {key:'corretiva', label:'Corretiva (imediata)', type:'red'};
+  if(rec && rec.count>=4) return {key:'preventiva', label:'Preventiva (programável)', type:'blue'};
+  return {key:'corretiva', label:'Corretiva (reativa)', type:'amber'};
+}
+function renderTratativas(data){
+  renderFlow();
+  const comps=componentStats(data);
+  const cur=els.selTrat.value;
+  optionize(els.selTrat, comps.map(c=>c.component), comps.length?'— selecione —':'Sem dados');
+  if(cur && comps.some(c=>c.component===cur)) els.selTrat.value=cur; else if(comps[0]) els.selTrat.value=comps[0].component;
+  drawFicha(data);
+}
+function drawFicha(data){
+  const comp=els.selTrat.value;
+  const rows=data.filter(d=>d.component===comp);
+  if(!comp||!rows.length){setHtml('fichaHead','<div class="hint">Selecione um componente.</div>');setHtml('fichaFlow','');els.fichaMsg.value='';return;}
+  const sis=rows[0].sistema, niv=dominantLevel(rows);
+  const ref=rows.find(r=>r.cid!=null);
+  const byMaq=groupBy(rows,r=>r.maq);
+  const topMaq=Object.entries(byMaq).sort((a,b)=>b[1].length-a[1].length)[0];
+  const maq=topMaq[0], frota=topMaq[1][0].frota;
+  const recAll=recurrenceStats(data);
+  const rec=recAll.find(r=>r.component===comp && r.maq===maq) || recAll.find(r=>r.component===comp);
+  const path=suggestPath(niv, rec);
+  const cidTxt=ref?` · CID ${ref.cid}${ref.cidDesc?` (${ref.cidDesc})`:''}`:'';
+  setHtml('fichaHead',`<div class="pill-row"><span class="badge tag-comp">${comp}</span><span class="badge tag-sys">${sis}</span>${badgeNivel(niv)}<span class="status-chip ${path.type==='red'?'st-iminente':path.type==='blue'?'st-estavel':'st-vencido'}">${path.label}</span><span class="pill">Equip.: ${maq} (${frota}) · ${new Set(rows.map(r=>r.maq)).size} máq. afetada(s)${cidTxt}</span></div>`);
+  // cadeia compacta de designação do caminho sugerido
+  const chain=[...new Set(FLOWS[path.key].map(s=>s.role))];
+  setHtml('fichaFlow',`<label class="meta">Designação (${path.label})</label><div class="flow" style="margin-top:6px">${FLOWS[path.key].slice(0,4).map(s=>`<div class="flow-step ${s.role==='dec'?'dec':''}"><span class="flow-role ${ROLE_CLASS[s.role]}">${ROLE_LABEL[s.role]}</span><div><div class="flow-act">${s.act}</div><span class="flow-meta">${s.meta}</span></div></div>`).join('')}</div>`);
+  let msg;
+  if(path.key==='corretiva'){
+    msg=`[CORRETIVA] ${maq} (${frota}) — Falha: ${comp}${ref?` (CID ${ref.cid})`:''}. Sistema: ${sis}. Nível: ${levelLabel(niv)}. Horímetro: ____  Local: ____.\nAcionar Controlador de Manutenção (faixa 4). Diagnóstico/prazo de liberação em até 20 min; divulgar no grupo de WhatsApp.`;
+  } else {
+    msg=`[PREVENTIVA] Programar parada de ${maq} (${frota}) — ${comp} (${sis})${ref?` · CID ${ref.cid}`:''} recorrente${rec?` (${rec.count} episódios, intervalo ~${fmtHours(rec.med)})`:''}.${rec&&rec.nextEst?` Próximo flare-up estimado: ${fmtDate(rec.nextEst)}.`:''}\nAvisar o Controlador de Operação 6 h antes; atualizar despacho para Manutenção Preventiva.`;
+  }
+  els.fichaMsg.value=msg;
+}
+function renderAnalytical(data){
+  const comps=componentStats(data).slice(0,30);
+  setHtml('tbAlarmes',comps.map(c=>`<tr><td>${c.component}</td><td><span class="badge tag-sys">${c.sistema}</span></td><td>${badgeNivel(c.niv)}</td><td class="num">${c.count}</td><td class="num">${c.share.toFixed(1)}%</td></tr>`).join('')||'<tr><td colspan="5">Sem dados.</td></tr>');
+  const sys=systemStats(data);
+  setHtml('tbSistemas',sys.map(s=>`<tr><td><strong>${s.sistema}</strong></td><td class="num">${s.total}</td><td class="num">${s.n3}</td><td class="num">${s.n2}</td><td class="num">${s.n1}</td><td class="num">${s.peso}</td></tr>`).join('')||'<tr><td colspan="6">Sem dados.</td></tr>');
+  const ops=operatorStats(data).slice(0,10);
+  makeChart('chartOperador',{type:'bar',data:{labels:ops.map(o=>o.operador),datasets:[{label:'Peso',data:ops.map(o=>o.peso),backgroundColor:'#46c37b'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:axisOpt()}});
+  setHtml('tbOperadores',ops.map(o=>`<tr><td>${o.operador}</td><td class="num">${o.count}</td><td class="num">${o.machines}</td><td class="num">${o.peso}</td></tr>`).join('')||'<tr><td colspan="4">Sem dados.</td></tr>');
+}
+function renderRaw(data){
+  const q=els.searchTable.value.trim().toLowerCase();
+  const rows=data.filter(d=>!q||[d.original,d.component,d.maq,d.operador,d.sistema,d.frota,d.tag].join(' ').toLowerCase().includes(q)).slice(0,500);
+  setHtml('tbRaw',rows.map(d=>`<tr><td>${fmtDate(d.date)}</td><td>${d.frota}</td><td>${d.maq}</td><td>${d.sistema}</td><td>${d.component}</td><td>${d.original}</td><td>${badgeNivel(d.nivel)}</td><td>${d.cid??'—'}</td><td>${d.fmi??'—'}</td><td>${d.operador}</td></tr>`).join('')||'<tr><td colspan="10">Sem dados.</td></tr>');
+}
+function renderAll(){
+  const d=state.data;
+  renderKPIs(d);renderExecutive(d);renderAssets(d);renderDiagnostico(d);renderPredicao(d);renderActions(d);renderPlaybooks(d);renderTratativas(d);renderTimeline(d);renderAnalytical(d);renderRaw(d);
+}
+
+/* ===================== LOAD ===================== */
+function loadRows(rows){ state.raw=rows.filter(r=>r.original&&r.maq); applyRefToData(); hydrateControls(); applyFilters(); }
+// Detecta o tipo de cada arquivo de referência pelos cabeçalhos e popula os dicionários.
+function ingestReference(rows){
+  if(!rows || !rows.length) return;
+  const cols = Object.keys(rows[0]).map(c=>c.trim());
+  const has = name => cols.find(c=>c.toLowerCase()===name);
+  const stripNum = s => String(s).replace(/\s*\(\d+\)\s*$/,'').trim();
+  const cidCol = has('cid'), fmiCol = has('fmi'), midCol = has('mid');
+  const cidDescCol = cols.find(c=>/cid/i.test(c) && /descri/i.test(c));
+  const midDescCol = cols.find(c=>/mid/i.test(c) && /descri/i.test(c));
+  const fmiDescCol = cols.find(c=>/fmi/i.test(c) && /descri/i.test(c));
+  if(cidCol && cidDescCol){
+    rows.forEach(r=>{
+      const num=String(r[cidCol]).trim(); const desc=stripNum(r[cidDescCol]);
+      if(!num||!desc) return;
+      state.cidDesc[num]=desc;
+      state.cidIndex.push({num, desc, tokens: cidTokens(desc)});
+    });
+  } else if(midCol && midDescCol){
+    rows.forEach(r=>{ const num=String(r[midCol]).trim(); const desc=stripNum(r[midDescCol]); if(num&&desc) state.midDict[num]=desc; });
+  } else if(fmiCol && fmiDescCol){
+    rows.forEach(r=>{ const num=String(r[fmiCol]).trim(); const desc=stripNum(r[fmiDescCol]); if(num!==''&&desc) FMI_DICT[Number(num)]=desc; });
+  }
+}
+function loadReferenceFiles(fileList){
+  const files=[...fileList]; if(!files.length) return;
+  let pending=files.length;
+  files.forEach(f=>Papa.parse(f,{header:true,skipEmptyLines:true,complete:res=>{
+    ingestReference(res.data);
+    if(--pending===0){
+      state.refLoaded = state.cidIndex.length>0;
+      applyRefToData(); applyFilters();
+    }
+  }}));
+}
+function exportCsv(){
+  const rows=state.data.map(d=>({Frota:d.frota,Maquina:d.maq,Data:fmtDate(d.date),Sistema:d.sistema,Componente:d.component,Alarme_original:d.original,Nivel:d.nivel,CID:d.cid??'',FMI:d.fmi??'',MID:d.mid??'',Operador:d.operador,TAG:d.tag}));
+  const csv=Papa.unparse(rows);const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='recorte_painel_preditivo_cat.csv';a.click();URL.revokeObjectURL(a.href);
+}
+
+/* ===================== WIRING ===================== */
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));$(b.dataset.page).classList.add('on');
+}));
+els.btnUpload.addEventListener('click',()=>els.fileInput.click());
+els.btnRef.addEventListener('click',()=>els.refInput.click());
+els.fileInput.addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;Papa.parse(f,{header:true,skipEmptyLines:true,complete:res=>loadRows(res.data.map(normalizeRow))});});
+els.refInput.addEventListener('change',e=>{ if(e.target.files.length) loadReferenceFiles(e.target.files); });
+els.btnSample.addEventListener('click',()=>loadRows(sampleData()));
+els.btnReset.addEventListener('click',()=>{document.querySelectorAll('.filters-grid select').forEach(s=>s.value='');syncMachineOptions();applyFilters();});
+els.selFrota.addEventListener('change',()=>{syncMachineOptions();applyFilters();});
+[els.selMaq,els.selSistema,els.selNivel,els.selOperador,els.selPeriodo].forEach(el=>el.addEventListener('change',applyFilters));
+els.selSeqWindow.addEventListener('change',()=>{state.seqWindowH=Number(els.selSeqWindow.value);renderPredicao(state.data);});
+els.selPlaybook.addEventListener('change',()=>drawPlaybook(state.data));
+els.btnFlowCorr.addEventListener('click',()=>{state.flowView='corretiva';renderFlow();});
+els.btnFlowPrev.addEventListener('click',()=>{state.flowView='preventiva';renderFlow();});
+els.selTrat.addEventListener('change',()=>drawFicha(state.data));
+els.btnCopyMsg.addEventListener('click',()=>{
+  const t=els.fichaMsg.value; if(!t) return;
+  const done=()=>{els.copyOk.style.display='inline-block';setTimeout(()=>els.copyOk.style.display='none',1500);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done).catch(()=>{els.fichaMsg.select();document.execCommand('copy');done();});}
+  else{els.fichaMsg.select();document.execCommand('copy');done();}
+});
+els.searchTable.addEventListener('input',()=>renderRaw(state.data));
+els.btnHelp.addEventListener('click',()=>els.helpDialog.showModal());
+els.closeHelp.addEventListener('click',()=>els.helpDialog.close());
+els.themeToggle.addEventListener('click',()=>{document.body.dataset.theme=document.body.dataset.theme==='light'?'dark':'light';renderAll();});
+els.btnExportCsv.addEventListener('click',exportCsv);
+loadRows(sampleData());
+</script>
+</body>
+</html>
